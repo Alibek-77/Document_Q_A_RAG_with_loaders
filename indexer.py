@@ -1,9 +1,9 @@
-from fastapi import UploadFile,File,HTTPException,status
+from fastapi import UploadFile,HTTPException,status
 from langchain_community.document_loaders import PyPDFLoader,TextLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from chroma_client import collection
 import tempfile,os
-async def upload_document(file:UploadFile=File(...)):
+async def upload_document(file:UploadFile):
     allowed_files_types=["application/pdf","text/plain"]
     if file.content_type not in allowed_files_types:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,detail="File type not supported")
@@ -13,10 +13,10 @@ async def upload_document(file:UploadFile=File(...)):
         tmp.write(content)
         tmp_path=tmp.name
     try:
-        if suffix=="pdf":
+        if suffix==".pdf":
             loader=PyPDFLoader(file_path=tmp_path)
         else:
-            loader=TextLoader(file_path=tmp_path)
+            loader=TextLoader(file_path=tmp_path,encoding='utf-8')
         documents=loader.load()
         for doc in documents:
             doc.metadata["original_filename"]=file.filename
@@ -29,7 +29,7 @@ async def upload_document(file:UploadFile=File(...)):
         collection.add(
             ids=[f"chunk_{file.filename}_{i}" for i in range(len(chunks))],
             metadatas=[chunk.metadata for chunk in chunks],
-            content=[chunk.page_content for chunk in chunks]
+            documents=[chunk.page_content for chunk in chunks]
         )
         return {
             "message":f"File {file.filename} indexed",
